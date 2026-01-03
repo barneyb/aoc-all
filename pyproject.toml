@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages]
+find = { }
+
+[project]
+name = "barneyb-aoc-all"
+description = "Advent of Code aggregate solver"
+authors = [
+    { name = "Barney Boisvert", email = "bboisvert@gmail.com" }
+]
+version = "2026.1"
+requires-python = ">= 3.11"
+dependencies = [
+    "advent-of-code-data",
+    "black",
+]

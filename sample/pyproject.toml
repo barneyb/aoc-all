@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages]
+find = { }
+
+[project]
+name = "barneyb-aoc-sample"
+description = "Sample plugin for barneyb-aoc-all"
+authors = [
+    { name = "Barney Boisvert", email = "bboisvert@gmail.com" }
+]
+version = "2026.1"
+requires-python = ">= 3.11"
+
+[project.entry-points."barneyb_aoc_all.support"]
+sample = "src.entry_points:support"
+[project.entry-points."barneyb_aoc_all.solve"]
+sample = "src.entry_points:solve"
