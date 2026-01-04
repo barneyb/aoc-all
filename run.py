@@ -1,6 +1,7 @@
 #!./.venv/bin/python
 
 import os
+from argparse import ArgumentParser
 from collections import Counter
 from importlib.metadata import entry_points, EntryPoint
 
@@ -8,7 +9,8 @@ from aocd.models import _load_users, NON_ANSWER, Puzzle
 from aocd.post import PuzzlePart, submit
 from aocd.runner import format_time, run_with_timeout
 
-YD = (int, int)
+YD = tuple[int, int]
+DEFAULT_TIMEOUT = 30
 MARK_CORRECT = "✔"
 MARK_INCORRECT = "✖"
 MARK_SKIP = "-"
@@ -33,6 +35,9 @@ class Day:
             return self.day == 25 if self.year < 2025 else self.day == 12
         raise AttributeError
 
+    def __str__(self):
+        return f"({self.year},{self.day})"
+
 
 class Plugin:
     def __init__(self, name: str, days: list[YD], solve: EntryPoint):
@@ -42,6 +47,51 @@ class Plugin:
 
     def __str__(self) -> str:
         return f"Plugin[{self.name}, {len(self.days)} days, {self.solve}]"
+
+
+def _load_args(plugins, accounts, can_run):
+    years = sorted({d.year for d in can_run})
+    days = sorted({d.day for d in can_run})
+    parser = ArgumentParser(
+        description="AoC all - run many solvers against many inputs"
+    )
+    parser.add_argument(
+        "-p",
+        "--plugins",
+        nargs="+",
+        choices=plugins,
+        # default=plugins,
+        help="List of plugins (solvers) to evaluate, all by default.",
+    )
+    parser.add_argument(
+        "-y",
+        "--years",
+        metavar=f"({years[0]}-{years[-1]})",
+        type=int,
+        nargs="+",
+        choices=years,
+        # default=years,
+        help="AoC years to run, all by default",
+    )
+    parser.add_argument(
+        "-d",
+        "--days",
+        metavar=f"({days[0]}-{days[-1]})",
+        type=int,
+        nargs="+",
+        choices=days,
+        # default=days,
+        help="AoC days to run, all by default",
+    )
+    parser.add_argument(
+        "-a",
+        "--accounts",
+        nargs="+",
+        choices=accounts,
+        # default=accounts,
+        help="accounts to run each plugin with, all by default.",
+    )
+    return parser.parse_args()
 
 
 def _load_plugins() -> list[Plugin]:
@@ -84,14 +134,27 @@ def get_mark(good: bool) -> str:
 
 
 if __name__ == "__main__":
+    plugins = _load_plugins()
     TOKENS = _load_users()
+    to_run = _load_days(plugins)
+
+    args = _load_args([p.name for p in plugins], [a for a in TOKENS], to_run)
+    if args.plugins:
+        keep = set(args.plugins)
+        plugins = [p for p in plugins if p.name in keep]
+    if args.accounts:
+        keep = set(args.accounts)
+        TOKENS = {a: t for a, t in TOKENS.items() if a in keep}
+    if args.years:
+        keep = set(args.years)
+        to_run = [d for d in to_run if d.year in keep]
+    if args.days:
+        keep = set(args.days)
+        to_run = [d for d in to_run if d.day in keep]
+
     N_ACCOUNTS = len(TOKENS)
     W_ACCOUNT = max([len(p) for p in TOKENS])
-
-    plugins = _load_plugins()
     W_PLUGIN = max([len(p.name) for p in plugins])
-
-    to_run = _load_days(plugins)
     W_TITLE = max([len(d.title) for d in to_run]) + 1
 
     DIVIDER = " | "
@@ -122,7 +185,7 @@ if __name__ == "__main__":
                 puzzle = d.get_puzzle(token)
                 a, b, walltime, error = run_with_timeout(
                     entry_point=p.solve,
-                    timeout=30,
+                    timeout=DEFAULT_TIMEOUT,
                     year=d.year,
                     day=d.day,
                     data=puzzle.input_data,
@@ -143,7 +206,7 @@ if __name__ == "__main__":
                         mark += get_mark(check_answer(puzzle, "b", b))
                 mark_stats.update(mark)
                 print(f"{mark:^{W_ACCOUNT}}{DIVIDER}", end="")
-            print(format_time(total_time / len(TOKENS), 15))
+            print(format_time(total_time / len(TOKENS), DEFAULT_TIMEOUT))
     if MARK_INCORRECT in mark_stats:
         print(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect !!")
     elif MARK_SKIP in mark_stats:
