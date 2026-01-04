@@ -1,13 +1,19 @@
 #!./.venv/bin/python
 
 import os
+from collections import Counter
 from importlib.metadata import entry_points, EntryPoint
-from aocd.models import Puzzle, _load_users
-from aocd.runner import run_with_timeout, format_time
-from aocd.post import submit, PuzzlePart
 
+from aocd.models import _load_users, NON_ANSWER, Puzzle
+from aocd.post import PuzzlePart, submit
+from aocd.runner import format_time, run_with_timeout
 
 YD = (int, int)
+MARK_CORRECT = "✔"
+MARK_INCORRECT = "✖"
+MARK_SKIP = "-"
+
+mark_stats = Counter()
 
 
 class Day:
@@ -19,6 +25,13 @@ class Day:
     def get_puzzle(self, token: str) -> Puzzle:
         os.environ["AOC_SESSION"] = token
         return Puzzle(self.year, self.day)
+
+    def __getattr__(self, item):
+        if item == "yd":
+            return self.year, self.day
+        if item == "is_last_day":
+            return self.day == 25 if self.year < 2025 else self.day == 12
+        raise AttributeError
 
 
 class Plugin:
@@ -58,14 +71,16 @@ def _load_days(plugins: list[Plugin]) -> list[Day]:
 
 
 def check_answer(puzzle: Puzzle, part: PuzzlePart, val):
+    if val in NON_ANSWER:
+        return None
     if getattr(puzzle, f"answered_{part}"):
         return val == getattr(puzzle, f"answer_{part}")
-    submit(val, part=part, day=puzzle.day, year=puzzle.year, reopen=False)
+    submit(val, part=part, day=puzzle.day, year=puzzle.year, reopen=False, quiet=True)
     return getattr(puzzle, f"answered_{part}")
 
 
 def get_mark(good: bool) -> str:
-    return "✔" if good else "✖"
+    return MARK_CORRECT if good else MARK_SKIP if good is None else MARK_INCORRECT
 
 
 if __name__ == "__main__":
@@ -92,7 +107,10 @@ if __name__ == "__main__":
         if d.year != last_year:
             print(f"{d.year} {RULE}")
             last_year = d.year
+            last_day = None
         for p in plugins:
+            if d.yd not in p.days:
+                continue
             if d.day != last_day:
                 print(f"{d.day:>4} {d.title:<{W_TITLE}}{DIVIDER}", end="")
                 last_day = d.day
@@ -101,11 +119,10 @@ if __name__ == "__main__":
             print(f"{p.name:>{W_PLUGIN}}{DIVIDER}", end="")
             total_time = 0
             for token in TOKENS.values():
-                # mark = '✖'
                 puzzle = d.get_puzzle(token)
                 a, b, walltime, error = run_with_timeout(
                     entry_point=p.solve,
-                    timeout=15,
+                    timeout=30,
                     year=d.year,
                     day=d.day,
                     data=puzzle.input_data,
@@ -121,8 +138,13 @@ if __name__ == "__main__":
                         print(f"Error retrieving answers: {error}")
                         exit(1)
                 else:
-                    mark = get_mark(check_answer(puzzle, "a", a)) + get_mark(
-                        check_answer(puzzle, "b", b)
-                    )
+                    mark = get_mark(check_answer(puzzle, "a", a))
+                    if not d.is_last_day:
+                        mark += get_mark(check_answer(puzzle, "b", b))
+                mark_stats.update(mark)
                 print(f"{mark:^{W_ACCOUNT}}{DIVIDER}", end="")
-            print(format_time(total_time))
+            print(format_time(total_time / len(TOKENS), 15))
+    if MARK_INCORRECT in mark_stats:
+        print(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect !!")
+    elif MARK_SKIP in mark_stats:
+        print(f"{mark_stats[MARK_SKIP]} skipped")
