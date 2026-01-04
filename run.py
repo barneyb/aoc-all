@@ -13,7 +13,26 @@ YD = tuple[int, int]
 DEFAULT_TIMEOUT = 30
 MARK_CORRECT = "✔"
 MARK_INCORRECT = "✖"
+MARK_UNKNOWN = "?"
 MARK_SKIP = "-"
+if __import__("platform").system() == "Windows":
+    os.system("color")
+RED = "\033[0;31m"
+GREEN = "\033[0;32m"
+DARK_GRAY = "\033[1;30m"
+LIGHT_PURPLE = "\033[1;35m"
+NEGATIVE = "\033[7m"
+END = "\033[0m"
+
+
+def colorize(s):
+    return (
+        s.replace(MARK_CORRECT, f"{GREEN}{MARK_CORRECT}{END}")
+        .replace(MARK_INCORRECT, f"{RED}{NEGATIVE}{MARK_INCORRECT}{END}")
+        .replace(MARK_UNKNOWN, f"{LIGHT_PURPLE}{MARK_UNKNOWN}{END}")
+        .replace(MARK_SKIP, f"{DARK_GRAY}{MARK_SKIP}{END}")
+    )
+
 
 mark_stats = Counter()
 
@@ -91,6 +110,13 @@ def _load_args(plugins, accounts, can_run):
         # default=accounts,
         help="accounts to run each plugin with, all by default.",
     )
+    parser.add_argument(
+        "-s",
+        "--no-submit",
+        action="store_false",
+        dest="autosubmit",
+        help="disable autosubmit, new answers are submitted by default.",
+    )
     return parser.parse_args()
 
 
@@ -120,17 +146,19 @@ def _load_days(plugins: list[Plugin]) -> list[Day]:
     return to_run
 
 
-def check_answer(puzzle: Puzzle, part: PuzzlePart, val):
+def get_mark(puzzle: Puzzle, part: PuzzlePart, val, autosubmit: bool):
     if val in NON_ANSWER:
-        return None
+        return MARK_SKIP
     if getattr(puzzle, f"answered_{part}"):
-        return val == getattr(puzzle, f"answer_{part}")
-    submit(val, part=part, day=puzzle.day, year=puzzle.year, reopen=False, quiet=True)
-    return getattr(puzzle, f"answered_{part}")
-
-
-def get_mark(good: bool) -> str:
-    return MARK_CORRECT if good else MARK_SKIP if good is None else MARK_INCORRECT
+        result = val == getattr(puzzle, f"answer_{part}")
+    elif autosubmit:
+        submit(
+            val, part=part, day=puzzle.day, year=puzzle.year, reopen=False, quiet=True
+        )
+        result = getattr(puzzle, f"answered_{part}")
+    else:
+        return MARK_UNKNOWN
+    return MARK_CORRECT if result else MARK_INCORRECT
 
 
 if __name__ == "__main__":
@@ -201,13 +229,18 @@ if __name__ == "__main__":
                         print(f"Error retrieving answers: {error}")
                         exit(1)
                 else:
-                    mark = get_mark(check_answer(puzzle, "a", a))
+                    mark = get_mark(puzzle, "a", a, args.autosubmit)
                     if not d.is_last_day:
-                        mark += get_mark(check_answer(puzzle, "b", b))
+                        if mark == MARK_UNKNOWN:
+                            mark += MARK_UNKNOWN
+                        else:
+                            mark += get_mark(puzzle, "b", b, args.autosubmit)
                 mark_stats.update(mark)
-                print(f"{mark:^{W_ACCOUNT}}{DIVIDER}", end="")
+                print(colorize(f"{mark:^{W_ACCOUNT}}{DIVIDER}"), end="")
             print(format_time(total_time / len(TOKENS), DEFAULT_TIMEOUT))
     if MARK_INCORRECT in mark_stats:
         print(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect !!")
-    elif MARK_SKIP in mark_stats:
+    if MARK_SKIP in mark_stats:
         print(f"{mark_stats[MARK_SKIP]} skipped")
+    if MARK_UNKNOWN in mark_stats:
+        print(f"{mark_stats[MARK_UNKNOWN]} unknown (not submitted)")
