@@ -170,6 +170,7 @@ if __name__ == "__main__":
     if args.plugins:
         keep = set(args.plugins)
         plugins = [p for p in plugins if p.name in keep]
+        to_run = _load_days(plugins)
     if args.accounts:
         keep = set(args.accounts)
         TOKENS = {a: t for a, t in TOKENS.items() if a in keep}
