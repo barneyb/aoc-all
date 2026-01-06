@@ -1,36 +1,33 @@
 #!./.venv/bin/python
-
 import os
+import time
 from argparse import ArgumentParser
 from collections import Counter
 from importlib.metadata import entry_points, EntryPoint
 
 from aocd.models import _load_users, NON_ANSWER, Puzzle
 from aocd.post import PuzzlePart, submit
-from aocd.runner import format_time, run_with_timeout
+from aocd.runner import _timeout_wrapper, colored
 
 YD = tuple[int, int]
+NS_PER_S = 1_000_000_000
 DEFAULT_TIMEOUT = 30
 MARK_CORRECT = "✔"
 MARK_INCORRECT = "✖"
 MARK_UNKNOWN = "?"
 MARK_SKIP = "-"
-if __import__("platform").system() == "Windows":
-    os.system("color")
-RED = "\033[0;31m"
-GREEN = "\033[0;32m"
-DARK_GRAY = "\033[1;30m"
-LIGHT_PURPLE = "\033[1;35m"
-NEGATIVE = "\033[7m"
-END = "\033[0m"
+MARK_CORRECT_COLORED = colored(MARK_CORRECT, "green")
+MARK_INCORRECT_COLORED = colored(MARK_INCORRECT, "red")
+MARK_UNKNOWN_COLORED = colored(MARK_UNKNOWN, "magenta")
+MARK_SKIP_COLORED = colored(MARK_SKIP, "yellow")
 
 
 def colorize(s):
     return (
-        s.replace(MARK_CORRECT, f"{GREEN}{MARK_CORRECT}{END}")
-        .replace(MARK_INCORRECT, f"{RED}{NEGATIVE}{MARK_INCORRECT}{END}")
-        .replace(MARK_UNKNOWN, f"{LIGHT_PURPLE}{MARK_UNKNOWN}{END}")
-        .replace(MARK_SKIP, f"{DARK_GRAY}{MARK_SKIP}{END}")
+        s.replace(MARK_CORRECT, MARK_CORRECT_COLORED)
+        .replace(MARK_INCORRECT, MARK_INCORRECT_COLORED)
+        .replace(MARK_UNKNOWN, MARK_UNKNOWN_COLORED)
+        .replace(MARK_SKIP, MARK_SKIP_COLORED)
     )
 
 
@@ -161,6 +158,51 @@ def get_mark(puzzle: Puzzle, part: PuzzlePart, val, autosubmit: bool):
     return MARK_CORRECT if result else MARK_INCORRECT
 
 
+def run_with_timeout(
+    entry_point: EntryPoint,
+    timeout: float,
+    dt: float = 0.1,
+    capture: bool = True,
+    **kwargs,
+) -> tuple[str, str, float, int, str]:
+    t0 = time.time()
+    func = entry_point.load()
+    future = _timeout_wrapper(func, capture=capture, timeout=timeout, **kwargs)
+    while not future.done():
+        time.sleep(dt)
+    walltime = time.time() - t0
+    reporttime = 0
+    try:
+        result = future.result()
+        if len(result) == 2:
+            a, b = result
+        elif len(result) == 3:
+            a, b, reporttime = result
+        else:
+            raise TypeError("Solve must return a 2- or 3-tuple")
+    except Exception as err:
+        a = b = ""
+        print(err)
+        error = repr(err)[:100]
+    else:
+        error = ""
+        # longest correct answer seen so far has been 57 chars
+        # that was the first example data from 2019/12/9 (i.e. the quine)
+        a = str(a)[:60]
+        b = str(b)[:60]
+    return a, b, walltime, reporttime, error
+
+
+def format_time(t: float, conv: str, timeout: float = DEFAULT_TIMEOUT) -> str:
+    if t < timeout / 4:
+        color = "green"
+    elif t < timeout / 2:
+        color = "yellow"
+    else:
+        color = "red"
+    return colored(f"{t:{conv}}", color)
+
+
 if __name__ == "__main__":
     plugins = _load_plugins()
     TOKENS = _load_users()
@@ -186,9 +228,12 @@ if __name__ == "__main__":
     W_PLUGIN = max([len(p.name) for p in plugins])
     W_TITLE = max([len(d.title) for d in to_run]) + 1
 
-    DIVIDER = " | "
-    W_LEFT = W_TITLE + len(DIVIDER) + W_PLUGIN
-    RULE = "=" * (W_LEFT + len(DIVIDER) + len(TOKENS) * (W_ACCOUNT + len(DIVIDER)) - 1)
+    DIVIDER = colored(" | ", "white")
+    W_DIVIDER = 3
+    W_LEFT = W_TITLE + W_DIVIDER + W_PLUGIN
+    RULE = colored(
+        "=" * (W_LEFT + W_DIVIDER + len(TOKENS) * (W_ACCOUNT + W_DIVIDER) + 10), "white"
+    )
     print(f"     {'':>{W_LEFT}}{DIVIDER}", end="")
     for a in TOKENS:
         print(f"{a:^{W_ACCOUNT}}{DIVIDER}", end="")
@@ -197,31 +242,34 @@ if __name__ == "__main__":
     last_day = None
     for d in to_run:
         if d.year != last_year:
-            print(f"{d.year} {RULE}")
+            ys = colored(str(d.year), "red")
+            print(f"{ys} {RULE}")
             last_year = d.year
             last_day = None
         for p in plugins:
             if d.yd not in p.days:
                 continue
             if d.day != last_day:
-                print(f"{d.day:>4} {d.title:<{W_TITLE}}{DIVIDER}", end="")
+                ds = colored(f"{d.day:>4}", "green")
+                print(f"{ds} {d.title:<{W_TITLE}}{DIVIDER}", end="")
                 last_day = d.day
             else:
-                print(f"{'':>4} {'':{W_TITLE + len(DIVIDER)}}", end="")
+                print(f"{'':>4} {'':{W_TITLE + W_DIVIDER}}", end="")
             print(f"{p.name:>{W_PLUGIN}}{DIVIDER}", end="")
-            total_time = 0
+            total_wall = 0
+            total_report = 0
             for token in TOKENS.values():
                 puzzle = d.get_puzzle(token)
-                a, b, walltime, error = run_with_timeout(
+                a, b, walltime, reporttime, error = run_with_timeout(
                     entry_point=p.solve,
                     timeout=DEFAULT_TIMEOUT,
                     year=d.year,
                     day=d.day,
                     data=puzzle.input_data,
-                    progress=None,
-                    capture=True,
                 )
-                total_time += walltime
+                total_wall += walltime
+                if reporttime is not None:
+                    total_report += reporttime / NS_PER_S
                 if error:
                     if error.startswith("TimeoutError("):
                         a = b = None
@@ -238,7 +286,17 @@ if __name__ == "__main__":
                             mark += get_mark(puzzle, "b", b, args.autosubmit)
                 mark_stats.update(mark)
                 print(colorize(f"{mark:^{W_ACCOUNT}}{DIVIDER}"), end="")
-            print(format_time(total_time / len(TOKENS), DEFAULT_TIMEOUT))
+            if total_report == 0:
+                print(
+                    colored("[", "white")
+                    + format_time(total_wall / len(TOKENS), "6.2f")
+                    + colored(" s]", "white")
+                )
+            else:
+                print(
+                    format_time(total_report / len(TOKENS), "8.3f")
+                    + colored("s", "white")
+                )
     if MARK_INCORRECT in mark_stats:
         print(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect !!")
     if MARK_SKIP in mark_stats:
