@@ -1,5 +1,6 @@
 #!./.venv/bin/python
 import os
+import sys
 import time
 from argparse import ArgumentParser
 from collections import Counter
@@ -16,6 +17,7 @@ MARK_CORRECT = "✔"
 MARK_INCORRECT = "✖"
 MARK_UNKNOWN = "?"
 MARK_SKIP = "-"
+MARK_TIMEOUT = "⧖"
 MARK_CORRECT_COLORED = colored(MARK_CORRECT, "green")
 MARK_INCORRECT_COLORED = colored(MARK_INCORRECT, "red")
 MARK_UNKNOWN_COLORED = colored(MARK_UNKNOWN, "magenta")
@@ -182,7 +184,6 @@ def run_with_timeout(
             raise TypeError("Solve must return a 2- or 3-tuple")
     except Exception as err:
         a = b = ""
-        print(err)
         error = repr(err)[:100]
     else:
         error = ""
@@ -272,8 +273,7 @@ if __name__ == "__main__":
                     total_report += reporttime / NS_PER_S
                 if error:
                     if error.startswith("TimeoutError("):
-                        a = b = None
-                        mark = "t/o"
+                        mark = MARK_TIMEOUT
                     else:
                         print(f"Error retrieving answers: {error}")
                         exit(1)
@@ -298,8 +298,10 @@ if __name__ == "__main__":
                     + colored("s", "white")
                 )
     if MARK_INCORRECT in mark_stats:
-        print(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect !!")
+        print(colored(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect !!", "red"))
+    if MARK_TIMEOUT in mark_stats:
+        print(colored(f"¡ {mark_stats[MARK_TIMEOUT]} timed out !", "red"))
     if MARK_SKIP in mark_stats:
-        print(f"{mark_stats[MARK_SKIP]} skipped")
+        print(colored(f"{mark_stats[MARK_SKIP]} skipped", "yellow"))
     if MARK_UNKNOWN in mark_stats:
-        print(f"{mark_stats[MARK_UNKNOWN]} unknown (not submitted)")
+        print(colored(f"{mark_stats[MARK_UNKNOWN]} unknown (not submitted)", "magenta"))

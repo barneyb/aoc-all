@@ -18,7 +18,7 @@ I have two tokens configured, so it yields output like this:
 2 skipped
 ```
 
-Part b is not implemented, and so marked skipped. Note that the time is an average - not the total - for the row's solutions, and includes process overhead out of the box. It'll tell you if your solver's slow, but won't confirm you've shaved off that last few tens of milliseconds. If your solver takes more than 30 seconds, it'll time out and be reported as `t/o`. Also note that your solvers' `STDOUT` is sent to `/dev/null`.
+Part b is not implemented, and so marked skipped. Note that the time is an average - not the total - for the row's solutions, and includes process overhead out of the box. It'll tell you if your solver's slow, but won't confirm you've shaved off that last few tens of milliseconds. If your solver takes more than 30 seconds, it'll time out and be reported as `⧖`. Also note that your solvers' `STDOUT` is sent to `/dev/null`.
 
 The `sample` folder is an example of how to set up a plugin and is what is running above. It can solve part A of the very first AoC puzzle: [Not Quite Lisp](https://adventofcode.com/2015/day/1).
 
