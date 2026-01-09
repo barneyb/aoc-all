@@ -204,7 +204,18 @@ def format_time(t: float, conv: str, timeout: float = DEFAULT_TIMEOUT) -> str:
     return colored(f"{t:{conv}}", color)
 
 
+def time_total(label: str, sec: float):
+    s = f"{label}: {sec:6.1f}  "
+    print(
+        f"{s:>{5 + W_TITLE + W_DIVIDER + W_PLUGIN + W_DIVIDER + len(TOKENS) * (W_ACCOUNT + W_DIVIDER) + 8}}",
+        end="",
+    )
+    print(colored("s", "white"))
+
+
 if __name__ == "__main__":
+    t0 = time.time()
+    solve_time = 0
     plugins = _load_plugins()
     TOKENS = _load_users()
     to_run = _load_days(plugins)
@@ -255,7 +266,7 @@ if __name__ == "__main__":
                 print(f"{ds} {d.title:<{W_TITLE}}{DIVIDER}", end="")
                 last_day = d.day
             else:
-                print(f"{'':>4} {'':{W_TITLE + W_DIVIDER}}", end="")
+                print(f"{'':4} {'':{W_TITLE + W_DIVIDER}}", end="")
             print(f"{p.name:>{W_PLUGIN}}{DIVIDER}", end="")
             total_wall = 0
             total_report = 0
@@ -271,6 +282,9 @@ if __name__ == "__main__":
                 total_wall += walltime
                 if reporttime is not None:
                     total_report += reporttime / NS_PER_S
+                    solve_time += reporttime / NS_PER_S
+                else:
+                    solve_time += walltime
                 if error:
                     if error.startswith("TimeoutError("):
                         mark = MARK_TIMEOUT
@@ -297,6 +311,8 @@ if __name__ == "__main__":
                     format_time(total_report / len(TOKENS), "8.3f")
                     + colored("s", "white")
                 )
+    time_total("solve", solve_time)
+    time_total("wall", time.time() - t0)
     if MARK_INCORRECT in mark_stats:
         print(colored(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect !!", "red"))
     if MARK_TIMEOUT in mark_stats:
