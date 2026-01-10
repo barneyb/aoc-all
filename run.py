@@ -1,6 +1,5 @@
 #!./.venv/bin/python
 import os
-import sys
 import time
 from argparse import ArgumentParser
 from collections import Counter
@@ -205,7 +204,7 @@ def format_time(t: float, conv: str, timeout: float = DEFAULT_TIMEOUT) -> str:
 
 
 def time_total(label: str, sec: float):
-    s = f"{label}: {sec:6.1f}  "
+    s = f"{label}: {sec:7.2f} "
     print(
         f"{s:>{5 + W_TITLE + W_DIVIDER + W_PLUGIN + W_DIVIDER + len(TOKENS) * (W_ACCOUNT + W_DIVIDER) + 8}}",
         end="",
