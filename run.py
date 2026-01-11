@@ -310,6 +310,7 @@ if __name__ == "__main__":
                     format_time(total_report / len(TOKENS), "8.3f")
                     + colored("s", "white")
                 )
+    print(f"{'':5}{RULE}")
     time_total("solve", solve_time)
     time_total("wall", time.time() - t0)
     if MARK_INCORRECT in mark_stats:
