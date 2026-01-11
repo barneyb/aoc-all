@@ -172,13 +172,13 @@ def run_with_timeout(
     while not future.done():
         time.sleep(dt)
     walltime = time.time() - t0
-    reporttime = 0
+    reportnanos = None
     try:
         result = future.result()
         if len(result) == 2:
             a, b = result
         elif len(result) == 3:
-            a, b, reporttime = result
+            a, b, reportnanos = result
         else:
             raise TypeError("Solve must return a 2- or 3-tuple")
     except Exception as err:
@@ -190,7 +190,7 @@ def run_with_timeout(
         # that was the first example data from 2019/12/9 (i.e. the quine)
         a = str(a)[:60]
         b = str(b)[:60]
-    return a, b, walltime, reporttime, error
+    return a, b, walltime, reportnanos, error
 
 
 def format_time(t: float, conv: str, timeout: float = DEFAULT_TIMEOUT) -> str:
@@ -206,7 +206,7 @@ def format_time(t: float, conv: str, timeout: float = DEFAULT_TIMEOUT) -> str:
 def time_total(label: str, sec: float):
     s = f"{label}: {sec:7.2f} "
     print(
-        f"{s:>{5 + W_TITLE + W_DIVIDER + W_PLUGIN + W_DIVIDER + len(TOKENS) * (W_ACCOUNT + W_DIVIDER) + 8}}",
+        f"{s:>{5 + W_TITLE + W_DIVIDER + W_PLUGIN + W_DIVIDER + N_ACCOUNTS * (W_ACCOUNT + W_DIVIDER) + 8}}",
         end="",
     )
     print(colored("s", "white"))
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     W_DIVIDER = 3
     W_LEFT = W_TITLE + W_DIVIDER + W_PLUGIN
     RULE = colored(
-        "=" * (W_LEFT + W_DIVIDER + len(TOKENS) * (W_ACCOUNT + W_DIVIDER) + 10), "white"
+        "=" * (W_LEFT + W_DIVIDER + N_ACCOUNTS * (W_ACCOUNT + W_DIVIDER) + 10), "white"
     )
     print(f"     {'':>{W_LEFT}}{DIVIDER}", end="")
     for a in TOKENS:
@@ -271,7 +271,7 @@ if __name__ == "__main__":
             total_report = 0
             for token in TOKENS.values():
                 puzzle = d.get_puzzle(token)
-                a, b, walltime, reporttime, error = run_with_timeout(
+                a, b, walltime, reportnanos, error = run_with_timeout(
                     entry_point=p.solve,
                     timeout=DEFAULT_TIMEOUT,
                     year=d.year,
@@ -279,9 +279,10 @@ if __name__ == "__main__":
                     data=puzzle.input_data,
                 )
                 total_wall += walltime
-                if reporttime is not None:
-                    total_report += reporttime / NS_PER_S
-                    solve_time += reporttime / NS_PER_S
+                if reportnanos is not None:
+                    reporttime = reportnanos / NS_PER_S
+                    total_report += reporttime
+                    solve_time += reporttime
                 else:
                     solve_time += walltime
                 if error:
@@ -302,12 +303,12 @@ if __name__ == "__main__":
             if total_report == 0:
                 print(
                     colored("[", "white")
-                    + format_time(total_wall / len(TOKENS), "6.2f")
+                    + format_time(total_wall / N_ACCOUNTS, "6.2f")
                     + colored(" s]", "white")
                 )
             else:
                 print(
-                    format_time(total_report / len(TOKENS), "8.3f")
+                    format_time(total_report / N_ACCOUNTS, "8.3f")
                     + colored("s", "white")
                 )
     print(f"{'':5}{RULE}")
