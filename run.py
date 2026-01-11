@@ -1,9 +1,11 @@
 #!./.venv/bin/python
+import datetime
 import os
 import time
 from argparse import ArgumentParser
 from collections import Counter
 from importlib.metadata import entry_points, EntryPoint
+from zoneinfo import ZoneInfo
 
 from aocd.models import _load_users, NON_ANSWER, Puzzle
 from aocd.post import PuzzlePart, submit
@@ -12,6 +14,7 @@ from aocd.runner import _timeout_wrapper, colored
 YD = tuple[int, int]
 NS_PER_S = 1_000_000_000
 DEFAULT_TIMEOUT = 30
+AOC_NOW = datetime.datetime.now(tz=ZoneInfo("America/New_York"))
 MARK_CORRECT = "✔"
 MARK_INCORRECT = "✖"
 MARK_UNKNOWN = "?"
@@ -57,18 +60,24 @@ class Day:
 
 
 class Plugin:
-    def __init__(self, name: str, days: list[YD], solve: EntryPoint):
+    def __init__(self, name: str, support: EntryPoint, solve: EntryPoint):
         self.name = name
-        self.days = days
+        self.support = support
         self.solve = solve
+
+    def __getattr__(self, item):
+        if item == "days":
+            self.days = self.support.load()()
+            return self.days
+        raise AttributeError
 
     def __str__(self) -> str:
         return f"Plugin[{self.name}, {len(self.days)} days, {self.solve}]"
 
 
-def _load_args(plugins, accounts, can_run):
-    years = sorted({d.year for d in can_run})
-    days = sorted({d.day for d in can_run})
+def _load_args(plugins, accounts):
+    days = range(1, 26)
+    years = range(2015, AOC_NOW.year + int(AOC_NOW.month == 12))
     parser = ArgumentParser(
         description="AoC all - run many solvers against many inputs"
     )
@@ -121,7 +130,7 @@ def _load_args(plugins, accounts, can_run):
 def _load_plugins() -> list[Plugin]:
     plugins_by_name = dict()
     for ep in entry_points(group="barneyb_aoc_all.support"):
-        support = ep.load()
+        support = ep
         name = ep.name
         if name in plugins_by_name:
             raise RuntimeError(f"Multiple entry points named '{name}' found")
@@ -131,7 +140,7 @@ def _load_plugins() -> list[Plugin]:
         if len(ep) > 1:
             raise RuntimeError(f"Found {len(ep)} solve entry points for '{name}'")
         (ep,) = ep
-        plugins_by_name[name] = Plugin(name, support(), ep)
+        plugins_by_name[name] = Plugin(name, support, ep)
     return sorted(plugins_by_name.values(), key=lambda p: p.name)
 
 
@@ -217,13 +226,12 @@ if __name__ == "__main__":
     solve_time = 0
     plugins = _load_plugins()
     TOKENS = _load_users()
-    to_run = _load_days(plugins)
 
-    args = _load_args([p.name for p in plugins], [a for a in TOKENS], to_run)
+    args = _load_args([p.name for p in plugins], [a for a in TOKENS])
     if args.plugins:
         keep = set(args.plugins)
         plugins = [p for p in plugins if p.name in keep]
-        to_run = _load_days(plugins)
+    to_run = _load_days(plugins)
     if args.accounts:
         keep = set(args.accounts)
         TOKENS = {a: t for a, t in TOKENS.items() if a in keep}
@@ -233,6 +241,10 @@ if __name__ == "__main__":
     if args.days:
         keep = set(args.days)
         to_run = [d for d in to_run if d.day in keep]
+
+    if len(to_run) == 0:
+        print(f"The registered {"plugin" if len(plugins) == 1 else "plugins"} ({", ".join(p.name for p in plugins)}) can solve any of the requested puzzle(s).")
+        exit(1)
 
     N_ACCOUNTS = len(TOKENS)
     W_ACCOUNT = max([len(p) for p in TOKENS])
