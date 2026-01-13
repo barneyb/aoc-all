@@ -42,7 +42,6 @@ class Day:
     def __init__(self, year: int, day: int):
         self.year = year
         self.day = day
-        self.title = Puzzle(year, day).title
 
     def get_puzzle(self, token: str) -> Puzzle:
         os.environ["AOC_SESSION"] = token
@@ -51,8 +50,14 @@ class Day:
     def __getattr__(self, item):
         if item == "yd":
             return self.year, self.day
+        if item == "title":
+            self.title = Puzzle(self.year, self.day).title
+            return self.title
+        last_day = 25 if self.year < 2025 else 12
         if item == "is_last_day":
-            return self.day == 25 if self.year < 2025 else self.day == 12
+            return self.day == last_day
+        if item == "is_official":
+            return 1 <= self.day <= last_day
         raise AttributeError
 
     def __str__(self):
@@ -97,7 +102,7 @@ def _load_args(plugins, accounts):
         nargs="+",
         choices=years,
         # default=years,
-        help="AoC years to run, all by default",
+        help="AoC years to run, all by default.",
     )
     parser.add_argument(
         "-d",
@@ -107,7 +112,7 @@ def _load_args(plugins, accounts):
         nargs="+",
         choices=days,
         # default=days,
-        help="AoC days to run, all by default",
+        help="AoC days to run, all by default.",
     )
     parser.add_argument(
         "-a",
@@ -122,7 +127,7 @@ def _load_args(plugins, accounts):
         "--no-submit",
         action="store_false",
         dest="autosubmit",
-        help="disable autosubmit, new answers are submitted by default.",
+        help="disable autosubmit.",
     )
     return parser.parse_args()
 
@@ -146,11 +151,16 @@ def _load_plugins() -> list[Plugin]:
 
 def _load_days(plugins: list[Plugin]) -> list[Day]:
     to_run = set()
+    W_PLUGIN = max([len(p.name) for p in plugins])
     for p in plugins:
-        to_run.update(p.days)
+        print(f"loading {p.name:>{W_PLUGIN}}...", end="", flush=True)
+        days = p.days
+        to_run.update(days)
+        n = len(days)
+        print(f"{n:>3} {"day" if n == 1 else "days"}")
     to_run = [Day(y, d) for (y, d) in to_run]
     to_run.sort(key=lambda d: d.year * 100 + d.day, reverse=True)
-    return to_run
+    return [d for d in to_run if d.is_official]
 
 
 def get_mark(puzzle: Puzzle, part: PuzzlePart, val, autosubmit: bool):
@@ -169,11 +179,11 @@ def get_mark(puzzle: Puzzle, part: PuzzlePart, val, autosubmit: bool):
 
 
 def run_with_timeout(
-    entry_point: EntryPoint,
-    timeout: float,
-    dt: float = 0.1,
-    capture: bool = True,
-    **kwargs,
+        entry_point: EntryPoint,
+        timeout: float,
+        dt: float = 0.1,
+        capture: bool = True,
+        **kwargs,
 ) -> tuple[str, str, float, int, str]:
     t0 = time.time()
     func = entry_point.load()
@@ -212,16 +222,7 @@ def format_time(t: float, conv: str, timeout: float = DEFAULT_TIMEOUT) -> str:
     return colored(f"{t:{conv}}", color)
 
 
-def time_total(label: str, sec: float):
-    s = f"{label}: {sec:7.2f} "
-    print(
-        f"{s:>{5 + W_TITLE + W_DIVIDER + W_PLUGIN + W_DIVIDER + N_ACCOUNTS * (W_ACCOUNT + W_DIVIDER) + 8}}",
-        end="",
-    )
-    print(colored("s", "white"))
-
-
-if __name__ == "__main__":
+def main():
     t0 = time.time()
     solve_time = 0
     plugins = _load_plugins()
@@ -243,7 +244,8 @@ if __name__ == "__main__":
         to_run = [d for d in to_run if d.day in keep]
 
     if len(to_run) == 0:
-        print(f"The registered {"plugin" if len(plugins) == 1 else "plugins"} ({", ".join(p.name for p in plugins)}) can solve any of the requested puzzle(s).")
+        print(
+            f"The registered {"plugin" if len(plugins) == 1 else "plugins"} ({", ".join(p.name for p in plugins)}) cannot solve any of the requested puzzle(s).")
         exit(1)
 
     N_ACCOUNTS = len(TOKENS)
@@ -306,7 +308,7 @@ if __name__ == "__main__":
                 else:
                     mark = get_mark(puzzle, "a", a, args.autosubmit)
                     if not d.is_last_day:
-                        if mark == MARK_UNKNOWN:
+                        if mark != MARK_CORRECT:
                             mark += MARK_UNKNOWN
                         else:
                             mark += get_mark(puzzle, "b", b, args.autosubmit)
@@ -323,14 +325,28 @@ if __name__ == "__main__":
                     format_time(total_report / N_ACCOUNTS, "8.3f")
                     + colored("s", "white")
                 )
+
+    def time_total(label: str, sec: float):
+        s = f"{label}: {sec:7.2f} "
+        print(
+            f"{s:>{5 + W_TITLE + W_DIVIDER + W_PLUGIN + W_DIVIDER + N_ACCOUNTS * (W_ACCOUNT + W_DIVIDER) + 8}}",
+            end="",
+        )
+        print(colored("s", "white"))
+
     print(f"{'':5}{RULE}")
     time_total("solve", solve_time)
     time_total("wall", time.time() - t0)
+
     if MARK_INCORRECT in mark_stats:
-        print(colored(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect !!", "red"))
+        print(colored(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect ({MARK_INCORRECT}) !!", "red"))
     if MARK_TIMEOUT in mark_stats:
-        print(colored(f"¡ {mark_stats[MARK_TIMEOUT]} timed out !", "red"))
+        print(colored(f"¡ {mark_stats[MARK_TIMEOUT]} timed out ({MARK_TIMEOUT}) !", "red"))
     if MARK_SKIP in mark_stats:
-        print(colored(f"{mark_stats[MARK_SKIP]} skipped", "yellow"))
+        print(colored(f"{mark_stats[MARK_SKIP]} skipped ({MARK_SKIP})", "yellow"))
     if MARK_UNKNOWN in mark_stats:
-        print(colored(f"{mark_stats[MARK_UNKNOWN]} unknown (not submitted)", "magenta"))
+        print(colored(f"{mark_stats[MARK_UNKNOWN]} unknown ({MARK_UNKNOWN}) (not submitted)", "magenta"))
+
+
+if __name__ == "__main__":
+    main()
