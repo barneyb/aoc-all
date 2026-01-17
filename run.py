@@ -308,7 +308,9 @@ def main():
                 else:
                     mark = get_mark(puzzle, "a", a, args.autosubmit)
                     if not d.is_last_day:
-                        if mark != MARK_CORRECT:
+                        if mark == MARK_SKIP:
+                            mark += MARK_SKIP if b in NON_ANSWER else MARK_UNKNOWN
+                        elif mark != MARK_CORRECT:
                             mark += MARK_UNKNOWN
                         else:
                             mark += get_mark(puzzle, "b", b, args.autosubmit)
