@@ -68,3 +68,7 @@ I added solver-reported timing for both 2023 plugins, which doesn't change how l
                                             sample |  ✔-   | [  0.20 s]
 2 skipped
 ```
+
+## .runrc
+
+If you want to easily re-run with the same args, you can create a `.runrc` file with the command-line args you wish to use. These are shadowed by args you supply on the command line itself, so they act as defaults. Unlike command line args, `.runrc` is treated literally - the quoting or escapes your shell supports are not available. Line comments are supported with `#`, which must be the first non-whitespace character on the line.

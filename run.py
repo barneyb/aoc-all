@@ -1,10 +1,12 @@
 #!./.venv/bin/python
 import datetime
 import os
+import sys
 import time
 from argparse import ArgumentParser
 from collections import Counter
 from importlib.metadata import entry_points, EntryPoint
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from aocd.models import _load_users, NON_ANSWER, Puzzle
@@ -129,7 +131,16 @@ def _load_args(plugins, accounts):
         dest="autosubmit",
         help="disable autosubmit.",
     )
-    return parser.parse_args()
+    args = []
+    rc_file = Path(".runrc")
+    if rc_file.is_file():
+        with open(rc_file, "r") as rc:
+            for line in rc:
+                if line.lstrip()[0] == '#':
+                    continue
+                args.extend(line.split())
+    args.extend(sys.argv[1:])
+    return parser.parse_args(args)
 
 
 def _load_plugins() -> list[Plugin]:
