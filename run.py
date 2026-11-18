@@ -1,5 +1,6 @@
 #!./.venv/bin/python
 import datetime
+import json
 import os
 import sys
 import time
@@ -91,17 +92,24 @@ def _load_args(plugins, accounts):
     parser.add_argument(
         "-p",
         "--plugins",
-        nargs="+",
+        nargs=None if len(plugins) == 1 else "+",
         choices=plugins,
         # default=plugins,
         help="List of plugins (solvers) to evaluate, all by default.",
+    )
+    parser.add_argument(
+        "--no-cache",
+        nargs="*",
+        choices=plugins,
+        # default=plugins,
+        help="Do not read plugins' supported days from cache, either specific ones or all configured.",
     )
     parser.add_argument(
         "-y",
         "--years",
         metavar=f"({years[0]}-{years[-1]})",
         type=int,
-        nargs="+",
+        nargs=None if len(years) == 1 else "+",
         choices=years,
         # default=years,
         help="AoC years to run, all by default.",
@@ -111,7 +119,7 @@ def _load_args(plugins, accounts):
         "--days",
         metavar=f"({days[0]}-{days[-1]})",
         type=int,
-        nargs="+",
+        nargs=None if len(days) == 1 else "+",
         choices=days,
         # default=days,
         help="AoC days to run, all by default.",
@@ -119,7 +127,7 @@ def _load_args(plugins, accounts):
     parser.add_argument(
         "-a",
         "--accounts",
-        nargs="+",
+        nargs=None if len(accounts) == 1 else "+",
         choices=accounts,
         # default=accounts,
         help="accounts to run each plugin with, all by default.",
@@ -160,15 +168,34 @@ def _load_plugins() -> list[Plugin]:
     return sorted(plugins_by_name.values(), key=lambda p: p.name)
 
 
-def _load_days(plugins: list[Plugin]) -> list[Day]:
+def _load_days(plugins: list[Plugin], no_cache: list[str]) -> list[Day]:
     to_run = set()
     W_PLUGIN = max([len(p.name) for p in plugins])
+    plugin_cache = dict()
+    save_cache = False
+    cache_file = Path(".plugin_cache.json")
+    if cache_file.is_file():
+        with open(cache_file, "r") as cache:
+            try:
+                plugin_cache = json.load(cache)
+            except Exception as err:
+                print(f"Failed to load plugin cache: {err}")
     for p in plugins:
-        print(f"loading {p.name:>{W_PLUGIN}}...", end="", flush=True)
-        days = p.days
+        read_cache = no_cache is None or (no_cache and p.name not in no_cache)
+        if p.name in plugin_cache and read_cache:
+            print(f"{p.name:>{W_PLUGIN}}: read cache   ", end="")
+            days = {(y, d) for [y, d] in plugin_cache[p.name]}
+        else:
+            print(f"{p.name:>{W_PLUGIN}}: requesting...", end="", flush=True)
+            days = p.days
+            plugin_cache[p.name] = list(days)
+            save_cache = True
         to_run.update(days)
         n = len(days)
         print(f"{n:>3} {"day" if n == 1 else "days"}")
+    if save_cache:
+        with open(cache_file, "w") as cache:
+            json.dump(plugin_cache, cache)
     to_run = [Day(y, d) for (y, d) in to_run]
     to_run.sort(key=lambda d: d.year * 100 + d.day, reverse=True)
     return [d for d in to_run if d.is_official]
@@ -243,7 +270,7 @@ def main():
     if args.plugins:
         keep = set(args.plugins)
         plugins = [p for p in plugins if p.name in keep]
-    to_run = _load_days(plugins)
+    to_run = _load_days(plugins, args.no_cache)
     if args.accounts:
         keep = set(args.accounts)
         TOKENS = {a: t for a, t in TOKENS.items() if a in keep}

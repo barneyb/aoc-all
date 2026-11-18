@@ -3,3 +3,4 @@
 *.egg-info/
 build/
 /.runrc
+/.plugin_cache.json
