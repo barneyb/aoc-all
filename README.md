@@ -29,7 +29,7 @@ The `barneyb_aoc_all.solve` entry point must resolve to a three-arg function whi
 A real example, for my 2023 solvers, can be found at https://github.com/barneyb/aoc-2023/blob/master/python/pyproject.toml. It has two entry points, one for Python solvers and one for Java solvers, which I'd mashed into the same repo. After installing, run with some filters:
 
 ```
-% python3 -m pip install ../aoc-2023/python
+% python3 -m pip install --editable ../aoc-2023/python
 % ./run.py -y 2023 2022 2015 -d 1 2 24 -a gmail
                                                    | gmail |
 2023 =======================================================
@@ -46,6 +46,8 @@ A real example, for my 2023 solvers, can be found at https://github.com/barneyb/
                                             sample |  ✔-   | [  0.20 s]
 2 skipped
 ```
+
+> **NB:** Installing with `--editable` isn't required, but it's probably what you want. 
 
 This illustrates the process overhead. The Java solvers are indirected through two layers of spawned processes, pass through Maven, and use filesystem IO for input passing. _Not Quite Lisp_ only takes a millisecond to run, so there's a full second of overhead.
 

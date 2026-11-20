@@ -2,6 +2,7 @@
 import datetime
 import json
 import os
+import re
 import sys
 import time
 from argparse import ArgumentParser
@@ -101,7 +102,6 @@ def _load_args(plugins, accounts):
         "--no-cache",
         nargs="*",
         choices=plugins,
-        # default=plugins,
         help="Do not read plugins' supported days from cache, either specific ones or all configured.",
     )
     parser.add_argument(
@@ -139,6 +139,12 @@ def _load_args(plugins, accounts):
         dest="autosubmit",
         help="disable autosubmit.",
     )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="all",
+        help="Run everything - ignore all other options (except --no-submit)",
+    )
     args = []
     rc_file = Path(".runrc")
     if rc_file.is_file():
@@ -149,6 +155,16 @@ def _load_args(plugins, accounts):
                 args.extend(line.split())
     args.extend(sys.argv[1:])
     return parser.parse_args(args)
+
+
+def year_from_name(name:str):
+    """
+    I return the first number in the given name, or zero if no digits were
+    found. E.g., 'bob123' gives 123 and '12and34' gives 12 (not 1234).
+    """
+    name = re.sub(r"^[a-zA-Z_]*", r"", name)
+    name = re.sub(r"^(\d+).*", r"\1", name)
+    return 0 if name == '' else int(name)
 
 
 def _load_plugins() -> list[Plugin]:
@@ -165,7 +181,8 @@ def _load_plugins() -> list[Plugin]:
             raise RuntimeError(f"Found {len(ep)} solve entry points for '{name}'")
         (ep,) = ep
         plugins_by_name[name] = Plugin(name, support, ep)
-    return sorted(plugins_by_name.values(), key=lambda p: p.name)
+    return sorted(plugins_by_name.values(),
+                  key=lambda p: (-year_from_name(p.name), p.name))
 
 
 def _load_days(plugins: list[Plugin], no_cache: list[str]) -> list[Day]:
@@ -183,7 +200,7 @@ def _load_days(plugins: list[Plugin], no_cache: list[str]) -> list[Day]:
     for p in plugins:
         read_cache = no_cache is None or (no_cache and p.name not in no_cache)
         if p.name in plugin_cache and read_cache:
-            print(f"{p.name:>{W_PLUGIN}}: read cache   ", end="")
+            print(f"{p.name:>{W_PLUGIN}}: from cache   ", end="")
             days = {(y, d) for [y, d] in plugin_cache[p.name]}
         else:
             print(f"{p.name:>{W_PLUGIN}}: requesting...", end="", flush=True)
@@ -267,19 +284,21 @@ def main():
     TOKENS = _load_users()
 
     args = _load_args([p.name for p in plugins], [a for a in TOKENS])
-    if args.plugins:
-        keep = set(args.plugins)
-        plugins = [p for p in plugins if p.name in keep]
+    if not args.all:
+        if args.plugins:
+            keep = set(args.plugins)
+            plugins = [p for p in plugins if p.name in keep]
     to_run = _load_days(plugins, args.no_cache)
-    if args.accounts:
-        keep = set(args.accounts)
-        TOKENS = {a: t for a, t in TOKENS.items() if a in keep}
-    if args.years:
-        keep = set(args.years)
-        to_run = [d for d in to_run if d.year in keep]
-    if args.days:
-        keep = set(args.days)
-        to_run = [d for d in to_run if d.day in keep]
+    if not args.all:
+        if args.accounts:
+            keep = set(args.accounts)
+            TOKENS = {a: t for a, t in TOKENS.items() if a in keep}
+        if args.years:
+            keep = set(args.years)
+            to_run = [d for d in to_run if d.year in keep]
+        if args.days:
+            keep = set(args.days)
+            to_run = [d for d in to_run if d.day in keep]
 
     if len(to_run) == 0:
         print(
