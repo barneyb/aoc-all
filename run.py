@@ -24,19 +24,48 @@ MARK_INCORRECT = "✖"
 MARK_UNKNOWN = "?"
 MARK_SKIP = "-"
 MARK_TIMEOUT = "⧖"
+MARK_LAST_HALF = "*"
+MARK_CORRECT_EMOJI = "✅"
+MARK_INCORRECT_EMOJI = "❌"
+MARK_UNKNOWN_EMOJI = "❓"
+MARK_SKIP_EMOJI = "⬜"
+MARK_TIMEOUT_EMOJI = "⌛"
+MARK_LAST_HALF_EMOJI = "⭐"
 MARK_CORRECT_COLORED = colored(MARK_CORRECT, "green")
 MARK_INCORRECT_COLORED = colored(MARK_INCORRECT, "red")
 MARK_UNKNOWN_COLORED = colored(MARK_UNKNOWN, "magenta")
 MARK_SKIP_COLORED = colored(MARK_SKIP, "yellow")
+MARK_LAST_HALF_COLORED = colored(MARK_LAST_HALF, "green")
 
 
 def colorize(s):
     return (
-        s.replace(MARK_CORRECT, MARK_CORRECT_COLORED)
-        .replace(MARK_INCORRECT, MARK_INCORRECT_COLORED)
-        .replace(MARK_UNKNOWN, MARK_UNKNOWN_COLORED)
-        .replace(MARK_SKIP, MARK_SKIP_COLORED)
+        s.replace(f" {MARK_CORRECT}", MARK_CORRECT_EMOJI)
+        .replace(f"{MARK_CORRECT} ", MARK_CORRECT_EMOJI)
+        .replace(MARK_CORRECT, MARK_CORRECT_EMOJI)
+        .replace(f" {MARK_INCORRECT}", MARK_INCORRECT_EMOJI)
+        .replace(f"{MARK_INCORRECT} ", MARK_INCORRECT_EMOJI)
+        .replace(MARK_INCORRECT, MARK_INCORRECT_EMOJI)
+        .replace(f" {MARK_UNKNOWN}", MARK_UNKNOWN_EMOJI)
+        .replace(f"{MARK_UNKNOWN} ", MARK_UNKNOWN_EMOJI)
+        .replace(MARK_UNKNOWN, MARK_UNKNOWN_EMOJI)
+        .replace(f" {MARK_SKIP}", MARK_SKIP_EMOJI)
+        .replace(f"{MARK_SKIP} ", MARK_SKIP_EMOJI)
+        .replace(MARK_SKIP, MARK_SKIP_EMOJI)
+        .replace(f" {MARK_TIMEOUT}", MARK_TIMEOUT_EMOJI)
+        .replace(f"{MARK_TIMEOUT} ", MARK_TIMEOUT_EMOJI)
+        .replace(MARK_TIMEOUT, MARK_TIMEOUT_EMOJI)
+        .replace(f" {MARK_LAST_HALF}", MARK_LAST_HALF_EMOJI)
+        .replace(f"{MARK_LAST_HALF} ", MARK_LAST_HALF_EMOJI)
+        .replace(MARK_LAST_HALF, MARK_LAST_HALF_EMOJI)
     )
+    # return (
+    #     s.replace(MARK_CORRECT, MARK_CORRECT_COLORED)
+    #     .replace(MARK_INCORRECT, MARK_INCORRECT_COLORED)
+    #     .replace(MARK_UNKNOWN, MARK_UNKNOWN_COLORED)
+    #     .replace(MARK_SKIP, MARK_SKIP_COLORED)
+    #     .replace(MARK_LAST_HALF, MARK_LAST_HALF_COLORED)
+    # )
 
 
 mark_stats = Counter()
@@ -364,7 +393,9 @@ def main():
                         exit(1)
                 else:
                     mark = get_mark(puzzle, "a", a, args.autosubmit)
-                    if not d.is_last_day:
+                    if  d.is_last_day:
+                        mark += MARK_LAST_HALF
+                    else:
                         if mark == MARK_SKIP:
                             mark += MARK_SKIP if b in NON_ANSWER else MARK_UNKNOWN
                         elif mark != MARK_CORRECT:
@@ -398,13 +429,13 @@ def main():
     time_total("wall", time.time() - t0)
 
     if MARK_INCORRECT in mark_stats:
-        print(colored(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect ({MARK_INCORRECT}) !!", "red"))
+        print(colorize(f"¡¡ {mark_stats[MARK_INCORRECT]} incorrect ({MARK_INCORRECT_EMOJI}) !!"))
     if MARK_TIMEOUT in mark_stats:
-        print(colored(f"¡ {mark_stats[MARK_TIMEOUT]} timed out ({MARK_TIMEOUT}) !", "red"))
+        print(colorize(f"¡ {mark_stats[MARK_TIMEOUT]} timed out ({MARK_TIMEOUT_EMOJI}) !"))
     if MARK_SKIP in mark_stats:
-        print(colored(f"{mark_stats[MARK_SKIP]} skipped ({MARK_SKIP})", "yellow"))
+        print(colorize(f"{mark_stats[MARK_SKIP]} skipped ({MARK_SKIP})"))
     if MARK_UNKNOWN in mark_stats:
-        print(colored(f"{mark_stats[MARK_UNKNOWN]} unknown ({MARK_UNKNOWN}) (not submitted)", "magenta"))
+        print(colorize(f"{mark_stats[MARK_UNKNOWN]} unknown ({MARK_UNKNOWN_EMOJI}) (not submitted)"))
 
 
 if __name__ == "__main__":
